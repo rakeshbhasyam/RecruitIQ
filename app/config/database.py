@@ -18,18 +18,32 @@ db = Database()
 
 async def connect_to_mongo():
     """Create database connection"""
-    db.client = AsyncIOMotorClient(settings.mongodb_url)
-    db.database = db.client[settings.database_name]
-    
-    # Initialize model instances with collections
-    db.jobs = JobModel(db.database.jobs)
-    db.candidates = CandidateModel(db.database.candidates)
-    db.scores = ScoreModel(db.database.scores)
-    db.audit_logs = AuditModel(db.database.audit_logs)
-    
-    # Create indexes for better performance
-    await create_indexes()
-    print(f"Connected to MongoDB database: {settings.database_name}")
+    try:
+        db.client = AsyncIOMotorClient(settings.mongodb_url, serverSelectionTimeoutMS=5000)
+        db.database = db.client[settings.database_name]
+        
+        # Test the connection
+        await db.client.admin.command('ping')
+        
+        # Initialize model instances with collections
+        db.jobs = JobModel(db.database.jobs)
+        db.candidates = CandidateModel(db.database.candidates)
+        db.scores = ScoreModel(db.database.scores)
+        db.audit_logs = AuditModel(db.database.audit_logs)
+        
+        # Create indexes for better performance
+        await create_indexes()
+        print(f"Connected to MongoDB database: {settings.database_name}")
+        
+    except Exception as e:
+        print(f"Failed to connect to MongoDB: {e}")
+        print("Using in-memory mock database for demo purposes...")
+        # Initialize mock database implementations
+        from app.models.mock_database import MockJobModel, MockCandidateModel, MockScoreModel, MockAuditModel
+        db.jobs = MockJobModel()
+        db.candidates = MockCandidateModel()
+        db.scores = MockScoreModel()
+        db.audit_logs = MockAuditModel()
 
 async def close_mongo_connection():
     """Close database connection"""

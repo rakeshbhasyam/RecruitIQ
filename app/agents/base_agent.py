@@ -36,18 +36,21 @@ class BaseAgent:
                           job_id: Optional[str] = None, candidate_id: Optional[str] = None):
         """Log agent activity for audit purposes"""
         try:
-            log_data = AuditLogCreate(
-                trace_id=trace_id,
-                agent=self.name,
-                prompt=prompt,
-                response=response,
-                tools_used=tools_used or [],
-                error=error,
-                metadata=metadata,
-                job_id=job_id,
-                candidate_id=candidate_id
-            )
-            await db.audit_logs.create_log(log_data.dict())
+            if db.audit_logs is not None:
+                log_data = AuditLogCreate(
+                    trace_id=trace_id,
+                    agent=self.name,
+                    prompt=prompt,
+                    response=response,
+                    tools_used=tools_used or [],
+                    error=error,
+                    metadata=metadata,
+                    job_id=job_id,
+                    candidate_id=candidate_id
+                )
+                await db.audit_logs.create_log(log_data.dict())
+            else:
+                print(f"Audit log (DB unavailable) - {self.name}: {trace_id} - {error or 'Success'}")
         except Exception as e:
             print(f"Failed to log activity for {self.name}: {e}")
     
