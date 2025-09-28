@@ -24,13 +24,13 @@ class InterviewAgent(BaseAgent):
             await self.log_activity(
                 trace_id=trace_id,
                 prompt=prompt[:500] + "...",
-                tools_used=["anthropic_claude"],
+                tools_used=["gemini"],
                 candidate_id=candidate_id,
                 job_id=job_id
             )
             
-            # Call Claude to generate questions
-            response = await self.call_anthropic(prompt, max_tokens=1500)
+            # Call Gemini to generate questions
+            response = await self.call_gemini(prompt, max_tokens=1500)
             
             # Extract questions from response
             questions = self._extract_questions(response)
@@ -71,13 +71,13 @@ class InterviewAgent(BaseAgent):
             await self.log_activity(
                 trace_id=trace_id,
                 prompt=prompt[:500] + "...",
-                tools_used=["anthropic_claude"],
+                tools_used=["gemini"],
                 candidate_id=candidate_id,
                 job_id=job_id
             )
             
-            # Call Claude to evaluate answers
-            response = await self.call_anthropic(prompt, max_tokens=2000)
+            # Call Gemini to evaluate answers
+            response = await self.call_gemini(prompt, max_tokens=2000)
             
             # Extract evaluation results
             evaluation = self._extract_evaluation(response)

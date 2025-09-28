@@ -20,6 +20,7 @@ dependencies = [
     "python-jose>=3.5.0",
     "python-multipart>=0.0.20",
     "uvicorn>=0.37.0",
+    "google-genai>=1.39.1",
 ]
 
 [[tool.uv.index]]

@@ -18,12 +18,12 @@ class ResumeParserAgent(BaseAgent):
             await self.log_activity(
                 trace_id=trace_id,
                 prompt=prompt[:500] + "...",  # Log first 500 chars
-                tools_used=["anthropic_claude"],
+                tools_used=["gemini"],
                 candidate_id=candidate_id
             )
             
-            # Call Claude to parse the resume
-            response = await self.call_anthropic(prompt, max_tokens=1500)
+            # Call Gemini to parse the resume
+            response = await self.call_gemini(prompt, max_tokens=1500)
             
             # Parse the JSON response
             parsed_data = self._extract_json_from_response(response)

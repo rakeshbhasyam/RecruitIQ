@@ -24,13 +24,13 @@ class ResumeMatcherAgent(BaseAgent):
             await self.log_activity(
                 trace_id=trace_id,
                 prompt=prompt[:500] + "...",
-                tools_used=["anthropic_claude"],
+                tools_used=["gemini"],
                 candidate_id=candidate_id,
                 job_id=job_id
             )
             
-            # Call Claude to perform matching
-            response = await self.call_anthropic(prompt, max_tokens=1000)
+            # Call Gemini to perform matching
+            response = await self.call_gemini(prompt, max_tokens=1000)
             
             # Parse the matching result
             matching_result = self._extract_matching_result(response)
