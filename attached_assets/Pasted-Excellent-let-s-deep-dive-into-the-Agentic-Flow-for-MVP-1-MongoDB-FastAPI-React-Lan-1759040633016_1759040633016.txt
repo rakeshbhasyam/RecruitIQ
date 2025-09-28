@@ -1,0 +1,197 @@
+Excellent — let’s deep dive into the **Agentic Flow** for **MVP 1** (MongoDB + FastAPI + React + LangGraph functional APIs).
+This is the *step-by-step workflow* of how the different agents interact, what data flows between them, and how state is persisted in MongoDB for reliability and auditability.
+
+---
+
+# **Detailed Agentic Flow**
+
+## **1. Job Creation**
+
+* **Actor**: Recruiter (via React UI).
+* **Flow**:
+
+  1. Recruiter submits a **Job Description (JD)** + **criteria** (skills, exp range, weights).
+  2. FastAPI receives request → stores into `jobs` collection in MongoDB.
+  3. **Job Criteria Agent** validates and normalizes criteria JSON (ensures consistent schema).
+  4. **JD Embeddings** are generated for semantic comparison later (stored in vector DB).
+
+**MongoDB entry (`jobs`):**
+
+```json
+{
+  "_id": "uuid",
+  "title": "Backend Engineer",
+  "jd_text": "...",
+  "criteria": {
+    "skills": ["Python", "FastAPI"],
+    "exp_min": 2,
+    "exp_max": 5,
+    "weights": { "skills": 0.5, "experience": 0.3, "interview": 0.2 }
+  },
+  "jd_embeddings": [0.123, 0.456, ...],
+  "created_at": "ISODate"
+}
+```
+
+---
+
+## **2. Resume Ingestion**
+
+* **Actor**: Candidate (via recruiter upload or portal).
+* **Flow**:
+
+  1. Resume uploaded → stored in S3/MinIO, reference stored in `candidates`.
+  2. **Ingestion Agent** fetches file → extracts text (PDF/DOCX parsing).
+  3. **Parser Agent** extracts structured info: skills, education, years exp, job titles.
+  4. **Embed Agent** generates embeddings from extracted text.
+  5. MongoDB updated with parsed data + embeddings reference.
+
+**MongoDB entry (`candidates`):**
+
+```json
+{
+  "_id": "uuid",
+  "job_id": "uuid",
+  "resume_uri": "s3://resumes/cand1.pdf",
+  "parsed_data": {
+    "name": "Alice",
+    "skills": ["Python", "Django"],
+    "experience": 3,
+    "education": "B.Tech CSE"
+  },
+  "resume_embeddings": [0.342, 0.654, ...],
+  "status": "parsed",
+  "created_at": "ISODate"
+}
+```
+
+---
+
+## **3. Resume Matching**
+
+* **Actor**: Matcher Agent (supervised by LangGraph).
+* **Flow**:
+
+  1. Candidate embeddings compared with JD embeddings in vector DB.
+  2. Rule-based scoring (skills overlap, experience match).
+  3. Produces **matcher_score** (0–1 scale) and breakdown.
+  4. Stored in `scores` collection.
+
+**MongoDB entry (`scores` partial):**
+
+```json
+{
+  "candidate_id": "uuid",
+  "matcher_score": 0.72,
+  "breakdown": {
+    "skills_match": 0.8,
+    "exp_match": 0.6
+  },
+  "created_at": "ISODate"
+}
+```
+
+---
+
+## **4. Interview Session (Text-based, MVP1)**
+
+* **Actor**: Candidate (via React Interview Console).
+* **Flow**:
+
+  1. Recruiter/candidate triggers interview → FastAPI → Interview Agent.
+  2. **Interview Agent** generates 3–5 JD + resume-aligned questions (e.g., coding, system design).
+  3. Candidate answers via React UI → submitted to backend.
+  4. Interview Agent evaluates each response against rubric (using JD + resume context).
+  5. Produces **interview_score** (0–1 scale) with justification.
+
+**MongoDB entry (`scores` update):**
+
+```json
+{
+  "candidate_id": "uuid",
+  "interview_score": 0.81,
+  "interview_breakdown": {
+    "q1": { "score": 0.9, "explanation": "Strong fundamentals" },
+    "q2": { "score": 0.7, "explanation": "Partial understanding" }
+  },
+  "created_at": "ISODate"
+}
+```
+
+---
+
+## **5. Final Scoring**
+
+* **Actor**: Scoring Agent.
+* **Flow**:
+
+  1. Aggregates **matcher_score** + **interview_score** using criteria weights.
+  2. Produces **final_score** and stores in MongoDB.
+  3. Candidate’s status updated to `scored`.
+
+**MongoDB entry (`scores` final):**
+
+```json
+{
+  "candidate_id": "uuid",
+  "matcher_score": 0.72,
+  "interview_score": 0.81,
+  "final_score": 0.77,
+  "breakdown": {
+    "skills_match": 0.8,
+    "exp_match": 0.6,
+    "interview": 0.81
+  }
+}
+```
+
+---
+
+## **6. Audit Logging**
+
+* **Actor**: Audit Agent (passive listener).
+* **Flow**:
+
+  * Captures each agent’s prompt, response, tools used, and errors.
+  * Saves into `audit_logs`.
+  * Recruiters can fetch via `/audit/{trace_id}` for compliance and debugging.
+
+**MongoDB entry (`audit_logs`):**
+
+```json
+{
+  "_id": "trace_id",
+  "agent": "InterviewAgent",
+  "prompt": "Generate 5 technical questions for JD: Backend Engineer",
+  "response": ["Explain REST vs GraphQL?", "What is asyncio?"],
+  "timestamp": "ISODate"
+}
+```
+
+---
+
+# **Agent Orchestration (LangGraph Functional API)**
+
+LangGraph is used as the **workflow engine**, chaining these agents:
+
+1. **Supervisor Agent**: Receives a trigger (resume upload, interview start).
+2. Calls **Ingestion → Parser → Embed → Matcher → Scoring** sequentially.
+3. Stores state in MongoDB after each step (so flow can resume if a crash happens).
+4. Allows human-in-the-loop overrides (optional in MVP1, required in MVP2).
+
+LangGraph advantage: stateful execution, clear tool/agent boundaries, auditability.
+
+---
+
+# **End-to-End Candidate Lifecycle (MVP1)**
+
+1. Recruiter posts job (criteria stored).
+2. Resume uploaded → parsed → matched → scored.
+3. Candidate takes interview → scored.
+4. Final composite score produced.
+5. Recruiter sees shortlist in React UI.
+6. All steps logged for auditability.
+
+---
+
+👉 Do you want me to **draw a sequence diagram (text or mermaid.js)** for this agentic flow, so your engineering team can visualize the step-by-step orchestration?
