@@ -94,15 +94,16 @@ Job Requirements:
 - Experience Range: {job_criteria.get('exp_min', 0)}-{job_criteria.get('exp_max', 10)} years
 - Job Description: {job.get('jd_text', '')[:500]}...
 
-Please analyze the match and return a JSON object with the following structure:
+Please analyze the match and return a JSON object with a `criteria_table` and other analysis.
+The `criteria_table` should be an array of objects, each representing a matching criterion.
+
 {{
-    "skills_match_score": "Score from 0.0 to 1.0 for skills alignment",
-    "experience_match_score": "Score from 0.0 to 1.0 for experience fit",
-    "skills_analysis": "Detailed analysis of skill matches and gaps",
-    "experience_analysis": "Analysis of experience level fit",
+    "criteria_table": [
+        {{"criterion": "Skill Match", "description": "Overlap between candidate & JD skills", "scoring_logic": "Jaccard similarity or LLM assessment", "score": 0.87}},
+        {{"criterion": "Experience Relevance", "description": "Role similarity + years of experience", "scoring_logic": "Semantic similarity and range check", "score": 0.82}},
+        {{"criterion": "Domain Fit", "description": "Industry and project alignment", "scoring_logic": "LLM reasoning based on project history", "score": 0.75}}
+    ],
     "overall_assessment": "Overall candidate fit summary",
-    "strengths": ["List of candidate strengths"],
-    "gaps": ["List of skill or experience gaps"]
 }}
 
 Scoring Guidelines:
@@ -127,21 +128,24 @@ JSON Response:"""
         except json.JSONDecodeError:
             # Fallback: create minimal structure
             return {
-                "skills_match_score": 0.5,
-                "experience_match_score": 0.5,
-                "skills_analysis": "Error parsing analysis",
-                "experience_analysis": "Error parsing analysis",
+                "criteria_table": [
+                    {"criterion": "Skill Match", "score": 0.5},
+                    {"criterion": "Experience Relevance", "score": 0.5}
+                ],
                 "overall_assessment": "Analysis failed",
-                "strengths": [],
-                "gaps": []
             }
     
     def _calculate_matcher_score(self, matching_result: Dict[str, Any], criteria: Dict[str, Any]) -> float:
         """Calculate final matcher score based on weights"""
         weights = criteria.get("weights", {"skills": 0.7, "experience": 0.3})
         
-        skills_score = matching_result.get("skills_match_score", 0.0)
-        exp_score = matching_result.get("experience_match_score", 0.0)
+        # Extract scores from the new criteria_table structure
+        criteria_table = matching_result.get("criteria_table", [])
+        skills_item = next((item for item in criteria_table if item.get("criterion") == "Skill Match"), {})
+        exp_item = next((item for item in criteria_table if item.get("criterion") == "Experience Relevance"), {})
+        
+        skills_score = skills_item.get("score", 0.0)
+        exp_score = exp_item.get("score", 0.0)
         
         # Ensure scores are floats
         if isinstance(skills_score, str):

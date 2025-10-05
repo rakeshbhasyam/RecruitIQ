@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # The FastAPI Application
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the current directory to the container's /app directory
+      # This enables hot-reloading for development
+      - .:/app
+    environment:
+      # The connection string for the MongoDB service
+      # 'mongo' is the service name defined below
+      - DATABASE_URL=mongodb://mongo:27017/agentic_recruitment
+    depends_on:
+      - mongo
+    # Override the Dockerfile's CMD to enable --reload for development
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # The MongoDB Database
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  # Named volume to persist MongoDB data
+  mongo_data:

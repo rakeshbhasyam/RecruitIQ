@@ -1,23 +1,32 @@
 import os
-from pydantic_settings import BaseSettings
+from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
+
+# Load .env file first
+load_dotenv()
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
     # Database settings
-    mongodb_url: str = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-    database_name: str = os.getenv("DATABASE_NAME", "agentic_recruitment")
-    
+    mongodb_url: str = "mongodb+srv://phanivutla2004:phaniphani@cluster0.gddku.mongodb.net/myFirstDatabase?retryWrites=true&w=majority&ssl=true"
+    database_name: str = "agentic_recruitment"
+
     # API settings
-    api_host: str = os.getenv("API_HOST", "0.0.0.0")
-    api_port: int = int(os.getenv("API_PORT", "5000"))
-    debug: bool = os.getenv("DEBUG", "False").lower() == "true"
-    
-    # Anthropic settings
-    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
-    
-    # Security
-    session_secret: str = os.getenv("SESSION_SECRET", "")
-    
-    class Config:
-        env_file = ".env"
+    api_host: str = "0.0.0.0"
+    api_port: int = 5000
+    debug: bool = False
+
+    # Google Gemini API key
+    google_api_key: str = Field(..., alias="GEMINI_API_KEY")
+
 
 settings = Settings()
+
+# Set the environment variable explicitly for Gemini SDK
+os.environ["GOOGLE_API_KEY"] = settings.google_api_key

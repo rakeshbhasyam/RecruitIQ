@@ -1,20 +1,13 @@
 import asyncio
 from typing import Dict, Any, Optional
-from app.agents import (
-    ResumeIngestionAgent,
-    ResumeParserAgent,
-    ResumeMatcherAgent,
-    InterviewAgent,
-    FinalScoringAgent
-)
-from app.config.database import db
 import uuid
+
+from app.config.database import db
+from app.agents import InterviewAgent, FinalScoringAgent
+from app.services.graph_service import recruitment_graph, AgentState
 
 class WorkflowService:
     def __init__(self):
-        self.ingestion_agent = ResumeIngestionAgent()
-        self.parser_agent = ResumeParserAgent()
-        self.matcher_agent = ResumeMatcherAgent()
         self.interview_agent = InterviewAgent()
         self.scoring_agent = FinalScoringAgent()
     
@@ -28,30 +21,22 @@ class WorkflowService:
             if not candidate:
                 raise ValueError("Candidate not found")
             
-            job_id = candidate["job_id"]
-            
-            # Step 1: Ingestion - Extract text from resume
-            ingestion_result = await self.ingestion_agent.process_resume(candidate_id, file_path, trace_id)
-            extracted_text = ingestion_result["extracted_text"]
-            
-            # Step 2: Parsing - Extract structured data
-            parsed_data = await self.parser_agent.parse_resume(candidate_id, extracted_text, trace_id)
-            
-            # Step 3: Matching - Score against job requirements
-            matching_result = await self.matcher_agent.match_candidate(candidate_id, job_id, trace_id)
-            
-            # Step 4: Calculate final score (interview will be done separately)
-            final_result = await self.scoring_agent.calculate_final_score(candidate_id, job_id, trace_id)
-            
-            return {
+            initial_state: AgentState = {
                 "trace_id": trace_id,
                 "candidate_id": candidate_id,
-                "job_id": job_id,
-                "ingestion": ingestion_result,
-                "parsing": parsed_data,
-                "matching": matching_result,
-                "final_scoring": final_result
+                "job_id": candidate["job_id"],
+                "file_path": file_path,
+                "resume_text": None,
+                "candidate_profile": None,
+                "job_match_report": None,
+                "interview_criteria": None,
+                "final_score": None,
+                "final_report": None,
             }
+            
+            # Invoke the graph asynchronously
+            final_state = await recruitment_graph.ainvoke(initial_state)
+            return final_state.get("final_report", {})
             
         except Exception as e:
             # Log the error

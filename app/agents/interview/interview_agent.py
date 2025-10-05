@@ -7,8 +7,14 @@ class InterviewAgent(BaseAgent):
     def __init__(self):
         super().__init__("InterviewAgent")
     
-    async def generate_questions(self, candidate_id: str, job_id: str, trace_id: str, num_questions: int = 5) -> List[str]:
-        """Generate interview questions based on job and candidate profile"""
+    async def generate_questions(
+        self, 
+        candidate_id: str, 
+        job_id: str, 
+        trace_id: str, 
+        num_questions: int = 3,
+        generate_criteria: bool = False
+    ) -> List[Any]:
         try:
             # Get candidate and job data
             candidate = await db.candidates.get_candidate(candidate_id)
@@ -18,7 +24,10 @@ class InterviewAgent(BaseAgent):
                 raise ValueError("Candidate or job not found")
             
             # Create question generation prompt
-            prompt = self._create_question_prompt(candidate, job, num_questions)
+            if generate_criteria:
+                prompt = self._create_interview_criteria_prompt(candidate, job, num_questions)
+            else:
+                prompt = self._create_question_prompt(candidate, job, num_questions)
             
             # Log the request
             await self.log_activity(
@@ -33,7 +42,10 @@ class InterviewAgent(BaseAgent):
             response = await self.call_gemini(prompt, max_tokens=1500)
             
             # Extract questions from response
-            questions = self._extract_questions(response)
+            if generate_criteria:
+                questions = self._extract_json_response(response)
+            else:
+                questions = self._extract_questions(response)
             
             # Log successful completion
             await self.log_activity(
@@ -150,6 +162,33 @@ Return the questions as a JSON array of strings:
 
 JSON Response:"""
     
+    def _create_interview_criteria_prompt(self, candidate: Dict[str, Any], job: Dict[str, Any], num_questions: int) -> str:
+        """Create prompt for generating interview criteria and questions."""
+        candidate_data = candidate.get("parsed_data", {})
+        
+        return f"""You are an expert HR strategist. Based on the job description and candidate profile, create an interview scoring rubric.
+
+Job Details:
+- Title: {job.get('title', 'N/A')}
+- Required Skills: {', '.join(job.get('criteria', {}).get('skills', []))}
+
+Candidate Profile:
+- Skills: {', '.join(candidate_data.get('skills', []))}
+- Experience: {candidate_data.get('experience_years', 0)} years
+
+Generate a JSON array of criteria objects. Each object should contain:
+1. "name": The evaluation criterion (e.g., "Technical Depth").
+2. "description": What is being assessed.
+3. "scoring_logic": How to rate the candidate on a 1-5 scale.
+4. "sample_questions": An array of {num_questions} relevant questions for that criterion.
+
+Example format:
+[
+  {{"name": "Technical Depth", "description": "...", "scoring_logic": "...", "sample_questions": ["..."]}}
+]
+
+JSON Response:"""
+    
     def _create_evaluation_prompt(self, job: Dict[str, Any], questions_and_answers: List[Dict[str, str]]) -> str:
         """Create prompt for evaluating candidate answers"""
         qa_text = "\n\n".join([f"Q: {qa['question']}\nA: {qa['answer']}" for qa in questions_and_answers])
@@ -189,46 +228,45 @@ Scoring Guidelines:
 
 JSON Response:"""
     
-    def _extract_questions(self, response: str) -> List[str]:
-        """Extract questions from Claude's response"""
+    def _extract_json_response(self, response: str) -> Any:
+        """Extracts a JSON object or array from the model's response string."""
         try:
             import re
-            # Find JSON array in response
-            json_match = re.search(r'\[.*\]', response, re.DOTALL)
-            if json_match:
-                json_str = json_match.group()
-                questions = json.loads(json_str)
-                return [q for q in questions if isinstance(q, str)]
-            else:
-                return json.loads(response)
-        except (json.JSONDecodeError, TypeError):
-            # Fallback: create default questions
-            return [
-                "Tell me about your experience with the technologies mentioned in this role.",
-                "Describe a challenging project you've worked on and how you solved it.",
-                "How do you approach learning new technologies?",
-                "Walk me through your problem-solving process for complex technical issues.",
-                "What interests you most about this position?"
-            ]
-    
-    def _extract_evaluation(self, response: str) -> Dict[str, Any]:
-        """Extract evaluation from Claude's response"""
-        try:
-            import re
-            # Find JSON object in response
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            # Greedily find the largest JSON object or array
+            json_match = re.search(r'(\{.*\}|\[.*\])', response, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
                 return json.loads(json_str)
             else:
                 return json.loads(response)
-        except json.JSONDecodeError:
-            # Fallback: create minimal evaluation
-            return {
-                "question_scores": [0.5] * 5,
-                "question_explanations": ["Evaluation error"] * 5,
-                "overall_score": 0.5,
-                "overall_assessment": "Unable to evaluate responses",
-                "strengths": [],
-                "areas_for_improvement": []
-            }
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+    def _extract_questions(self, response: str) -> List[str]:
+        """Extract questions from the model's response"""
+        questions = self._extract_json_response(response)
+        if isinstance(questions, list) and all(isinstance(q, str) for q in questions):
+            return questions
+        # Fallback for non-JSON or incorrect format
+        return [
+            "Tell me about your experience with the technologies mentioned in this role.",
+            "Describe a challenging project you've worked on and how you solved it.",
+            "How do you approach learning new technologies?",
+            "Walk me through your problem-solving process for complex technical issues.",
+            "What interests you most about this position?"
+        ]
+    
+    def _extract_evaluation(self, response: str) -> Dict[str, Any]:
+        """Extract evaluation from the model's response"""
+        evaluation = self._extract_json_response(response)
+        if isinstance(evaluation, dict):
+            return evaluation
+        # Fallback: create minimal evaluation
+        return {
+            "question_scores": [0.5] * 5,
+            "question_explanations": ["Evaluation error"] * 5,
+            "overall_score": 0.5,
+            "overall_assessment": "Unable to evaluate responses",
+            "strengths": [],
+            "areas_for_improvement": []
+        }
