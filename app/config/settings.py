@@ -14,13 +14,13 @@ class Settings(BaseSettings):
     )
 
     # Database settings
-    mongodb_url: str = "mongodb+srv://phanivutla2004:phaniphani@cluster0.gddku.mongodb.net/myFirstDatabase?retryWrites=true&w=majority&ssl=true"
-    database_name: str = "agentic_recruitment"
+    mongodb_url: str = Field(..., alias="MONGODB_URL")
+    database_name: str = Field(default="agentic_recruitment", alias="DATABASE_NAME")
 
     # API settings
-    api_host: str = "0.0.0.0"
-    api_port: int = 5000
-    debug: bool = False
+    api_host: str = Field(default="0.0.0.0", alias="API_HOST")
+    api_port: int = Field(default=5000, alias="API_PORT")
+    debug: bool = Field(default=False, alias="DEBUG")
 
     # Google Gemini API key
     google_api_key: str = Field(..., alias="GEMINI_API_KEY")
@@ -30,3 +30,4 @@ settings = Settings()
 
 # Set the environment variable explicitly for Gemini SDK
 os.environ["GOOGLE_API_KEY"] = settings.google_api_key
+
