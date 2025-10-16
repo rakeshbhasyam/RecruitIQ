@@ -42,9 +42,6 @@ The system uses a multi-agent architecture orchestrated by LangGraph:
 - **Backend**: FastAPI, Python 3.11+
 - **Database**: MongoDB 7.0+
 - **AI/ML**: Google Gemini API, LangChain, LangGraph
-- **Document Processing**: PyPDF2, python-docx
-- **Authentication**: JWT tokens with python-jose
-- **File Handling**: aiofiles, python-multipart
 
 ## 📋 Prerequisites
 
@@ -154,25 +151,10 @@ The system provides comprehensive logging and monitoring:
 - **Performance Metrics**: Response times and success rates
 - **Health Checks**: System health monitoring endpoints
 
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
 
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-- **Documentation**: Check the `/docs` endpoint when running the application
-- **Issues**: Report bugs and request features via [GitHub Issues](https://github.com/yourusername/recruitiq/issues)
-- **Discussions**: Join our [GitHub Discussions](https://github.com/yourusername/recruitiq/discussions) for questions and community support
 
 ## 🗺️ Roadmap
 
