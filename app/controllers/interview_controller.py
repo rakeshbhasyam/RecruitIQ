@@ -1,8 +1,12 @@
 from fastapi import APIRouter, HTTPException, status
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from app.services.workflow_service import WorkflowService
 from app.config.database import db
+from app.schemas.interview_session import (
+    InterviewSessionCreate, InterviewSessionResponse, 
+    NextQuestionRequest, NextQuestionResponse
+)
 
 router = APIRouter(prefix="/interviews", tags=["interviews"])
 workflow_service = WorkflowService()
@@ -34,9 +38,63 @@ async def generate_interview_questions(request: InterviewRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/start")
+async def start_interview_session(session_data: InterviewSessionCreate):
+    """Start a new streaming interview session"""
+    try:
+        result = await workflow_service.start_interview_session(
+            session_data.candidate_id,
+            session_data.job_id,
+            session_data.max_questions
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/next_question")
+async def get_next_question(request: NextQuestionRequest):
+    """Get the next question in the interview session"""
+    try:
+        result = await workflow_service.get_next_question(
+            request.session_id,
+            request.answer
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/session/{session_id}")
+async def get_interview_session(session_id: str):
+    """Get interview session details"""
+    try:
+        session = await db.interview_sessions.get_session(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Interview session not found")
+        return session
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/candidate/{candidate_id}/sessions")
+async def get_candidate_sessions(candidate_id: str, skip: int = 0, limit: int = 100):
+    """Get all interview sessions for a candidate"""
+    try:
+        sessions = await db.interview_sessions.get_sessions_by_candidate(candidate_id, skip, limit)
+        return {"sessions": sessions, "total": len(sessions)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/job/{job_id}/sessions")
+async def get_job_sessions(job_id: str, skip: int = 0, limit: int = 100):
+    """Get all interview sessions for a job"""
+    try:
+        sessions = await db.interview_sessions.get_sessions_by_job(job_id, skip, limit)
+        return {"sessions": sessions, "total": len(sessions)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.post("/submit")
 async def submit_interview_answers(submission: InterviewSubmission):
-    """Submit interview answers for evaluation"""
+    """Submit interview answers for evaluation (legacy endpoint)"""
     try:
         # Convert to expected format
         questions_and_answers = [

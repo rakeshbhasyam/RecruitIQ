@@ -206,3 +206,108 @@ class MockAuditModel:
         for log in logs:
             log["_id"] = str(log["_id"])
         return logs
+
+class MockInterviewSessionModel:
+    def __init__(self, collection=None):
+        self.sessions = {}
+    
+    async def create_session(self, session_data: dict) -> str:
+        """Create a new interview session"""
+        session_id = str(uuid.uuid4())
+        session_doc = {
+            **session_data,
+            "_id": session_id,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+            "status": "active",
+            "current_question_index": 0,
+            "questions_and_answers": [],
+            "context": {},
+            "is_completed": False
+        }
+        self.sessions[session_id] = session_doc
+        return session_id
+    
+    async def get_session(self, session_id: str) -> Optional[dict]:
+        """Get interview session by ID"""
+        session = self.sessions.get(session_id)
+        if session:
+            session["_id"] = str(session["_id"])
+        return session
+    
+    async def get_active_session(self, candidate_id: str, job_id: str) -> Optional[dict]:
+        """Get active interview session for candidate and job"""
+        for session in self.sessions.values():
+            if (session.get("candidate_id") == candidate_id and 
+                session.get("job_id") == job_id and 
+                session.get("status") == "active"):
+                session["_id"] = str(session["_id"])
+                return session
+        return None
+    
+    async def update_session(self, session_id: str, update_data: dict) -> bool:
+        """Update interview session"""
+        if session_id in self.sessions:
+            self.sessions[session_id].update(update_data)
+            self.sessions[session_id]["updated_at"] = datetime.utcnow()
+            return True
+        return False
+    
+    async def add_question_answer(self, session_id: str, question: str, answer: str, 
+                                question_score: Optional[float] = None, 
+                                explanation: Optional[str] = None) -> bool:
+        """Add a question-answer pair to the session"""
+        if session_id in self.sessions:
+            qa_pair = {
+                "question": question,
+                "answer": answer,
+                "score": question_score,
+                "explanation": explanation,
+                "timestamp": datetime.utcnow()
+            }
+            self.sessions[session_id]["questions_and_answers"].append(qa_pair)
+            self.sessions[session_id]["current_question_index"] += 1
+            self.sessions[session_id]["updated_at"] = datetime.utcnow()
+            return True
+        return False
+    
+    async def update_context(self, session_id: str, context: dict) -> bool:
+        """Update session context"""
+        if session_id in self.sessions:
+            self.sessions[session_id]["context"] = context
+            self.sessions[session_id]["updated_at"] = datetime.utcnow()
+            return True
+        return False
+    
+    async def complete_session(self, session_id: str, overall_score: float, 
+                             overall_assessment: str) -> bool:
+        """Mark session as completed"""
+        if session_id in self.sessions:
+            self.sessions[session_id].update({
+                "status": "completed",
+                "is_completed": True,
+                "overall_score": overall_score,
+                "overall_assessment": overall_assessment,
+                "completed_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            })
+            return True
+        return False
+    
+    async def get_sessions_by_candidate(self, candidate_id: str, skip: int = 0, limit: int = 100) -> List[dict]:
+        """Get all interview sessions for a candidate"""
+        sessions = [session for session in self.sessions.values() 
+                   if session.get("candidate_id") == candidate_id][skip:skip+limit]
+        sessions.sort(key=lambda x: x.get("created_at"), reverse=True)
+        for session in sessions:
+            session["_id"] = str(session["_id"])
+        return sessions
+    
+    async def get_sessions_by_job(self, job_id: str, skip: int = 0, limit: int = 100) -> List[dict]:
+        """Get all interview sessions for a job"""
+        sessions = [session for session in self.sessions.values() 
+                   if session.get("job_id") == job_id][skip:skip+limit]
+        sessions.sort(key=lambda x: x.get("created_at"), reverse=True)
+        for session in sessions:
+            session["_id"] = str(session["_id"])
+        return sessions

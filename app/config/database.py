@@ -2,6 +2,7 @@ from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from typing import Optional
 from .settings import settings
 from app.models import JobModel, CandidateModel, ScoreModel, AuditModel
+from app.models.interview_session import InterviewSessionModel
 
 class Database:
     client: Optional[AsyncIOMotorClient] = None
@@ -12,6 +13,7 @@ class Database:
     candidates: Optional[CandidateModel] = None
     scores: Optional[ScoreModel] = None
     audit_logs: Optional[AuditModel] = None
+    interview_sessions: Optional[InterviewSessionModel] = None
 
 # Global database instance
 db = Database()
@@ -30,6 +32,7 @@ async def connect_to_mongo():
         db.candidates = CandidateModel(db.database.candidates)
         db.scores = ScoreModel(db.database.scores)
         db.audit_logs = AuditModel(db.database.audit_logs)
+        db.interview_sessions = InterviewSessionModel(db.database.interview_sessions)
         
         # Create indexes for better performance
         await create_indexes()
@@ -39,11 +42,12 @@ async def connect_to_mongo():
         print(f"Failed to connect to MongoDB: {e}")
         print("Using in-memory mock database for demo purposes...")
         # Initialize mock database implementations
-        from app.models.mock_database import MockJobModel, MockCandidateModel, MockScoreModel, MockAuditModel
+        from app.models.mock_database import MockJobModel, MockCandidateModel, MockScoreModel, MockAuditModel, MockInterviewSessionModel
         db.jobs = MockJobModel()
         db.candidates = MockCandidateModel()
         db.scores = MockScoreModel()
         db.audit_logs = MockAuditModel()
+        db.interview_sessions = MockInterviewSessionModel()
 
 async def close_mongo_connection():
     """Close database connection"""
@@ -74,6 +78,12 @@ async def create_indexes():
         await db.database.audit_logs.create_index("job_id")
         await db.database.audit_logs.create_index("candidate_id")
         await db.database.audit_logs.create_index("timestamp")
+        
+        # Interview session indexes
+        await db.database.interview_sessions.create_index("candidate_id")
+        await db.database.interview_sessions.create_index("job_id")
+        await db.database.interview_sessions.create_index("status")
+        await db.database.interview_sessions.create_index("created_at")
         
         print("Database indexes created successfully")
     except Exception as e:

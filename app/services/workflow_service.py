@@ -48,8 +48,53 @@ class WorkflowService:
             })
             raise e
     
+    async def start_interview_session(self, candidate_id: str, job_id: str, max_questions: int = 5) -> Dict[str, Any]:
+        """Start a new streaming interview session"""
+        trace_id = str(uuid.uuid4())
+        
+        try:
+            result = await self.interview_agent.start_interview_session(
+                candidate_id, job_id, max_questions, trace_id
+            )
+            
+            return {
+                "trace_id": trace_id,
+                **result
+            }
+            
+        except Exception as e:
+            await db.audit_logs.create_log({
+                "trace_id": trace_id,
+                "agent": "WorkflowService",
+                "error": str(e),
+                "candidate_id": candidate_id,
+                "job_id": job_id
+            })
+            raise e
+    
+    async def get_next_question(self, session_id: str, answer: Optional[str] = None) -> Dict[str, Any]:
+        """Get the next question in the interview session"""
+        trace_id = str(uuid.uuid4())
+        
+        try:
+            result = await self.interview_agent.get_next_question(session_id, answer, trace_id)
+            
+            return {
+                "trace_id": trace_id,
+                **result
+            }
+            
+        except Exception as e:
+            await db.audit_logs.create_log({
+                "trace_id": trace_id,
+                "agent": "WorkflowService",
+                "error": str(e),
+                "session_id": session_id
+            })
+            raise e
+
     async def conduct_interview(self, candidate_id: str, job_id: str, num_questions: int = 5) -> Dict[str, Any]:
-        """Generate interview questions for candidate"""
+        """Generate interview questions for candidate (legacy method)"""
         trace_id = str(uuid.uuid4())
         
         try:
