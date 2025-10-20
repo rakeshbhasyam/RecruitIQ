@@ -1,3 +1,8 @@
+"""
+Resume Parser Agent for RecruitIQ system.
+Extracts structured information from resume text using AI-powered parsing.
+"""
+
 import re
 import json
 from typing import Dict, Any, List, Optional
@@ -6,48 +11,61 @@ from app.agents.base_agent import BaseAgent
 from app.config.database import db
 
 class ResumeParserAgent(BaseAgent):
+    """
+    AI agent responsible for parsing resume text and extracting structured candidate information.
+    
+    Features:
+    - Comprehensive resume data extraction
+    - Experience calculation based on current date
+    - Project and work experience parsing
+    - Contact information extraction including social profiles
+    """
+    
     def __init__(self):
         super().__init__("ResumeParserAgent")
     
     async def parse_resume(self, candidate_id: str, extracted_text: str, trace_id: str) -> Dict[str, Any]:
-        """Parse structured data from resume text using Claude"""
+        """
+        Parse structured data from resume text using AI.
+        
+        Args:
+            candidate_id: Unique identifier for the candidate
+            extracted_text: Raw text extracted from resume
+            trace_id: Unique identifier for tracking this operation
+            
+        Returns:
+            Dictionary containing structured candidate information
+            
+        Raises:
+            Exception: If parsing fails
+        """
         try:
-            # Create parsing prompt
             prompt = self._create_parsing_prompt(extracted_text)
             
-            # Log the parsing request
             await self.log_activity(
                 trace_id=trace_id,
-                prompt=prompt[:500] + "...",  # Log first 500 chars
+                prompt=prompt[:500] + "...",
                 tools_used=["gemini"],
                 candidate_id=candidate_id
             )
             
-            # Call Gemini to parse the resume
             response = await self.call_gemini(prompt, max_tokens=1500)
-            
-            # Parse the JSON response
             parsed_data = self._extract_json_from_response(response)
-            
-            # Validate and clean the parsed data
             cleaned_data = self._validate_and_clean_data(parsed_data)
             
-            # Update candidate with parsed data
             await db.candidates.update_parsed_data(candidate_id, cleaned_data)
             
-            # Log successful completion
             await self.log_activity(
                 trace_id=trace_id,
                 response=json.dumps(cleaned_data, indent=2),
                 metadata={"skills_count": len(cleaned_data.get("skills", [])),
-                         "experience_years": cleaned_data.get("experience", 0)},
+                         "experience_years": cleaned_data.get("experience_years", 0)},
                 candidate_id=candidate_id
             )
             
             return cleaned_data
             
         except Exception as e:
-            # Log error
             await self.log_activity(
                 trace_id=trace_id,
                 error=str(e),
@@ -56,7 +74,15 @@ class ResumeParserAgent(BaseAgent):
             raise e
     
     def _create_parsing_prompt(self, extracted_text: str) -> str:
-        """Create prompt for Claude to parse resume data"""
+        """
+        Create a comprehensive prompt for AI to parse resume data.
+        
+        Args:
+            extracted_text: Raw text from resume
+            
+        Returns:
+            Formatted prompt string for AI processing
+        """
         current_date = datetime.now().strftime("%Y-%m-%d")
         return f"""You are an expert resume parser. Extract comprehensive structured information from the following resume text and return it as a JSON object.
 
@@ -132,18 +158,23 @@ Important instructions:
 JSON Response:"""
     
     def _extract_json_from_response(self, response: str) -> Dict[str, Any]:
-        """Extract JSON object from Claude's response"""
+        """
+        Extract and parse JSON object from AI response.
+        
+        Args:
+            response: Raw response text from AI
+            
+        Returns:
+            Parsed JSON data or fallback structure
+        """
         try:
-            # Find JSON object in response
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
                 return json.loads(json_str)
             else:
-                # If no JSON found, try to parse the entire response
                 return json.loads(response)
         except json.JSONDecodeError:
-            # Fallback: create minimal structure
             return {
                 "name": None,
                 "skills": [],
@@ -159,21 +190,27 @@ JSON Response:"""
             }
     
     def _validate_and_clean_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate and clean parsed data"""
+        """
+        Validate and clean parsed resume data.
+        
+        Args:
+            data: Raw parsed data from AI
+            
+        Returns:
+            Cleaned and validated data structure
+        """
         work_experience = self._clean_work_experience(data.get("work_experience", []))
         
-        # Calculate experience years from work experience if not provided or if it's 0
         experience_years = data.get("experience_years", 0)
         if not experience_years or experience_years == 0:
             experience_years = self._calculate_experience_years(work_experience)
         else:
-            # Ensure it's a number
             try:
                 experience_years = float(experience_years)
             except (ValueError, TypeError):
                 experience_years = self._calculate_experience_years(work_experience)
         
-        cleaned = {
+        return {
             "name": data.get("name"),
             "skills": self._clean_skills_list(data.get("skills", [])),
             "experience_years": max(0, experience_years),
@@ -186,17 +223,23 @@ JSON Response:"""
             "work_experience": work_experience,
             "additional_info": data.get("additional_info", {})
         }
-        return cleaned
     
     def _clean_skills_list(self, skills: List[str]) -> List[str]:
-        """Clean and normalize skills list"""
+        """
+        Clean and normalize skills list by removing duplicates and whitespace.
+        
+        Args:
+            skills: List of skill strings
+            
+        Returns:
+            Cleaned list of unique skills
+        """
         if not isinstance(skills, list):
             return []
         
         cleaned_skills = []
         for skill in skills:
             if isinstance(skill, str) and skill.strip():
-                # Remove extra whitespace and normalize
                 cleaned_skill = ' '.join(skill.strip().split())
                 if cleaned_skill and cleaned_skill not in cleaned_skills:
                     cleaned_skills.append(cleaned_skill)
@@ -204,7 +247,15 @@ JSON Response:"""
         return cleaned_skills
     
     def _clean_projects_list(self, projects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Clean and normalize projects list"""
+        """
+        Clean and normalize projects list, filtering out invalid URLs.
+        
+        Args:
+            projects: List of project dictionaries
+            
+        Returns:
+            Cleaned list of valid projects
+        """
         if not isinstance(projects, list):
             return []
         
@@ -212,11 +263,9 @@ JSON Response:"""
         for project in projects:
             if isinstance(project, dict):
                 url = project.get("url", "")
-                # Clean up URL - if it's a placeholder or invalid, set to None
                 if not url or url in ["GitHubRepo/", "github.com/", "https://github.com/", ""]:
                     url = None
                 elif not url.startswith(("http://", "https://", "github.com/")):
-                    # If it doesn't look like a real URL, set to None
                     url = None
                 
                 cleaned_project = {
@@ -225,13 +274,21 @@ JSON Response:"""
                     "technologies": [tech for tech in project.get("technologies", []) if tech],
                     "url": url
                 }
-                if cleaned_project["name"]:  # Only add if project has a name
+                if cleaned_project["name"]:
                     cleaned_projects.append(cleaned_project)
         
         return cleaned_projects
     
     def _clean_contact_info(self, contact_info: Dict[str, Any]) -> Dict[str, Any]:
-        """Clean and normalize contact info"""
+        """
+        Clean and normalize contact information.
+        
+        Args:
+            contact_info: Raw contact information dictionary
+            
+        Returns:
+            Cleaned contact information
+        """
         if not isinstance(contact_info, dict):
             return {}
         
@@ -244,7 +301,15 @@ JSON Response:"""
         }
     
     def _clean_work_experience(self, work_experience: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Clean and normalize work experience list"""
+        """
+        Clean and normalize work experience list.
+        
+        Args:
+            work_experience: List of work experience dictionaries
+            
+        Returns:
+            Cleaned list of work experience entries
+        """
         if not isinstance(work_experience, list):
             return []
         
@@ -259,13 +324,21 @@ JSON Response:"""
                     "achievements": [ach for ach in exp.get("achievements", []) if ach],
                     "technologies": [tech for tech in exp.get("technologies", []) if tech]
                 }
-                if cleaned_exp["title"]:  # Only add if job has a title
+                if cleaned_exp["title"]:
                     cleaned_experience.append(cleaned_exp)
         
         return cleaned_experience
     
     def _calculate_experience_years(self, work_experience: List[Dict[str, Any]]) -> float:
-        """Calculate total experience years from work experience"""
+        """
+        Calculate total experience years from work experience data.
+        
+        Args:
+            work_experience: List of work experience entries
+            
+        Returns:
+            Total experience in years (rounded to 1 decimal place)
+        """
         if not work_experience:
             return 0.0
         
@@ -277,20 +350,25 @@ JSON Response:"""
             if not duration:
                 continue
                 
-            # Try to extract months from duration string
             months = self._extract_months_from_duration(duration, current_date)
             total_months += months
         
-        # Convert months to years
         return round(total_months / 12, 1)
     
     def _extract_months_from_duration(self, duration: str, current_date: datetime) -> int:
-        """Extract months from duration string"""
+        """
+        Extract months from duration string using various patterns.
+        
+        Args:
+            duration: Duration string (e.g., "2 years", "6 months", "2020 - Present")
+            current_date: Current date for calculating ongoing positions
+            
+        Returns:
+            Number of months represented by the duration
+        """
         duration_lower = duration.lower()
         
-        # Handle "Present" or "Current"
         if "present" in duration_lower or "current" in duration_lower:
-            # Look for start date
             import re
             year_match = re.search(r'(\d{4})', duration)
             if year_match:
@@ -298,7 +376,6 @@ JSON Response:"""
                 months = (current_date.year - start_year) * 12 + (current_date.month - 1)
                 return max(0, months)
         
-        # Handle month patterns
         month_patterns = [
             (r'(\d+)\s*months?', 1),
             (r'(\d+)\s*years?\s*(\d+)\s*months?', lambda m: int(m.group(1)) * 12 + int(m.group(2))),

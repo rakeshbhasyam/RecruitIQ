@@ -1,3 +1,8 @@
+"""
+Candidate data schemas for RecruitIQ system.
+Defines Pydantic models for candidate information validation and serialization.
+"""
+
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Any
 from datetime import datetime
