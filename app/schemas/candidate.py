@@ -12,16 +12,33 @@ class ContactInfo(BaseModel):
     linkedin: Optional[str] = Field(None, description="URL to LinkedIn profile")
     github: Optional[str] = Field(None, description="URL to GitHub profile")
 
+class Project(BaseModel):
+    """Schema for project information."""
+    name: str = Field(..., description="Project name")
+    description: Optional[str] = Field(None, description="Project description")
+    technologies: List[str] = Field(default=[], description="Technologies used in the project")
+    url: Optional[str] = Field(None, description="Project URL or repository link (null if no real URL found)")
+
+class WorkExperience(BaseModel):
+    """Schema for work experience information."""
+    title: str = Field(..., description="Job title")
+    company: Optional[str] = Field(None, description="Company name")
+    duration: Optional[str] = Field(None, description="Duration or date range")
+    description: Optional[str] = Field(None, description="Job description and responsibilities")
+    achievements: List[str] = Field(default=[], description="Key achievements and accomplishments")
+    technologies: List[str] = Field(default=[], description="Technologies used in this role")
+
 class ParsedData(BaseModel):
     name: Optional[str] = Field(None, description="Candidate name")
     skills: List[str] = Field(default=[], description="Extracted skills")
     experience_years: Optional[float] = Field(None, description="Total years of professional experience")
     education: Optional[str] = Field(None, description="Education details")
     job_titles: List[str] = Field(default=[], description="Previous job titles")
-    projects: List[str] = Field(default=[], description="Key projects mentioned")
+    projects: List[Project] = Field(default=[], description="Detailed project information")
     summary: Optional[str] = Field(None, description="AI-generated summary of the candidate's profile")
     certifications: List[str] = Field(default=[], description="Certifications")
     contact_info: Optional[ContactInfo] = Field(None, description="Structured contact information")
+    work_experience: List[WorkExperience] = Field(default=[], description="Detailed work experience")
     additional_info: Optional[dict[str, Any]] = Field(None, description="Additional parsed information")
 
 class CandidateCreate(BaseModel):
